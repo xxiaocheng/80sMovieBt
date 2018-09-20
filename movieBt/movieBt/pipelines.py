@@ -6,6 +6,45 @@
 # See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 
 import pymongo
+from scrapy.exceptions import DropItem
+from pymongo import MongoClient
+
+client = MongoClient("mongodb://127.0.0.1:27017/")
+database = client["movie"]
+collection = database["bt"]
+
+
+def get_urls():
+    '''
+    将数据库中已经存在的url作为一个list返回
+    '''
+    query = {}
+    projection = {}
+    projection["url"] = u"$url"
+
+    cursor = collection.find(query, projection = projection)
+
+    urls=[]
+    try:
+        for doc in cursor:
+            urls.append(doc['url'])
+    finally:
+        client.close()
+
+    return urls
+
+
+
+class DuplicatesPipeline(object):
+
+    def __init__(self):
+        self.urls_seen = get_urls()
+
+    def process_item(self, item, spider):
+        if item['url'] in self.urls_seen:
+            raise DropItem("Duplicate item found: %s" % item)
+        else:
+            return item
 
 
 class MoviebtPipeline(object):
